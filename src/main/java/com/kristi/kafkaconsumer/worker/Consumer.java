@@ -1,5 +1,7 @@
 package com.kristi.kafkaconsumer.worker;
 
+import java.io.FileWriter;
+import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
 import java.util.Properties;
@@ -48,7 +50,9 @@ public class Consumer implements Runnable {
         int retryCount = 10;
         int noRecordsCount = 0;
 
-        try {
+        try (FileWriter csvWriter = new FileWriter("out.csv")) {
+            csvWriter.append("Consumer id,Partition id,Offset,Payload").append("\n");
+
             do {
                 ConsumerRecords<String, String> records = consumer.poll(Duration.ofMinutes(1));
                 if (records.count() == 0) {
@@ -60,10 +64,18 @@ public class Consumer implements Runnable {
                     for (ConsumerRecord<String, String> record : records) {
                         LOGGER.info("consumerId={} partitionId={}, offset={}, payload: {}",
                                 id, record.partition(), record.offset(), record.value());
+
+                        csvWriter.append(String.valueOf(id)).append(",")
+                                .append(String.valueOf(record.partition())).append(",")
+                                .append(String.valueOf(record.offset())).append(",")
+                                .append(record.value()).append("\n");
                     }
                 }
+                csvWriter.flush();
             } while (noRecordsCount < retryCount);
 
+        } catch (IOException e) {
+            LOGGER.warn("Couldn't write to csv file");
         } finally {
             consumer.close();
         }
